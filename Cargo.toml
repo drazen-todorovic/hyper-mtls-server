@@ -1,0 +1,15 @@
+[package]
+name = "hyper-mtls-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rustls = "0.21.8"
+rustls-pemfile = "1.0.3"
+thiserror = "1.0.50"
+tokio = { version = "1.33.0", features = ["net"] }
+tokio-rustls = "0.24.1"
+hyper = { version = "0.14.27", features = ["server", "tcp", "http1", "http2"] }
+futures-util = "0.3.29"
