@@ -27,13 +27,13 @@ impl Protocol {
 
 #[derive(thiserror::Error, Debug)]
 #[error("{msg}")]
-pub struct CertificateErrorDetail {
+pub struct CertErrorDetail {
     msg: String,
     #[source]
     source: std::io::Error,
 }
 
-impl CertificateErrorDetail {
+impl CertErrorDetail {
     fn new(msg: String, source: std::io::Error) -> Self {
         Self { msg, source }
     }
@@ -42,10 +42,10 @@ impl CertificateErrorDetail {
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("failed reading certificate from file")]
-    CertFileReadError(#[source] CertificateErrorDetail),
+    CertFileReadError(#[source] CertErrorDetail),
 
     #[error("failed extracting certificate from file")]
-    CertExtractError(#[source] std::io::Error),
+    CertExtractError(#[source] CertErrorDetail),
 
     #[error("failed reading private key from file")]
     PrivateKeyFileReadError(#[source] std::io::Error),
@@ -109,10 +109,13 @@ impl MtlServer {
     fn load_cert(path: &str) -> Result<Vec<Certificate>, Error> {
         let cert_file = File::open(path).map_err(|x| {
             let msg = format!("failed to read certificate form path: {}", path);
-            CertFileReadError(CertificateErrorDetail::new(msg, x))
+            CertFileReadError(CertErrorDetail::new(msg, x))
         })?;
         let mut reader = BufReader::new(cert_file);
-        let certs = rustls_pemfile::certs(&mut reader).map_err(CertExtractError)?;
+        let certs = rustls_pemfile::certs(&mut reader).map_err(|x| {
+            let msg = format!("failed to extract certificate from file: {}", path);
+            CertExtractError(CertErrorDetail::new(msg, x))
+        })?;
         Ok(certs.into_iter().map(Certificate).collect())
     }
 
