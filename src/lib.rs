@@ -1,7 +1,6 @@
 use crate::Error::{
-    CertExtractError, CertFileReadError, PrivateKeyExtractError,
-    PrivateKeyFileReadError, PrivateKeyItemEmptyError,
-    PrivateKeyUnsupportedFormat, ServeListenerError, ServerConfigError,
+    CertExtractError, CertFileReadError, PrivateKeyExtractError, PrivateKeyFileReadError,
+    PrivateKeyItemEmptyError, PrivateKeyUnsupportedFormat, ServeListenerError, ServerConfigError,
     TrustStoreError,
 };
 use futures_util::future::poll_fn;
@@ -83,8 +82,7 @@ impl MtlServer {
         server_key_path: Box<str>,
         client_ca_cert_path: Box<str>,
     ) -> Self {
-        let protocols =
-            Some(vec![Protocol::HTTP_1, Protocol::HTTP_2].into_boxed_slice());
+        let protocols = Some(vec![Protocol::HTTP_1, Protocol::HTTP_2].into_boxed_slice());
         Self {
             server_cert_path,
             server_key_path,
@@ -114,8 +112,7 @@ impl MtlServer {
             CertFileReadError(CertificateErrorDetail::new(msg, x))
         })?;
         let mut reader = BufReader::new(cert_file);
-        let certs =
-            rustls_pemfile::certs(&mut reader).map_err(CertExtractError)?;
+        let certs = rustls_pemfile::certs(&mut reader).map_err(CertExtractError)?;
         Ok(certs.into_iter().map(Certificate).collect())
     }
 
@@ -128,8 +125,7 @@ impl MtlServer {
     }
 
     fn load_server_key(&self) -> Result<PrivateKey, Error> {
-        let key_file = File::open(self.server_key_path.deref())
-            .map_err(PrivateKeyFileReadError)?;
+        let key_file = File::open(self.server_key_path.deref()).map_err(PrivateKeyFileReadError)?;
         let mut reader = BufReader::new(key_file);
 
         let item = rustls_pemfile::read_one(&mut reader)
@@ -172,22 +168,16 @@ impl MtlServer {
         Ok(config)
     }
 
-    pub async fn serve<F>(
-        &self,
-        listener: TcpListener,
-        callback: F,
-    ) -> Result<(), Error>
+    pub async fn serve<F>(&self, listener: TcpListener, callback: F) -> Result<(), Error>
     where
         F: Fn(AddrStream, TlsAcceptor) + 'static,
     {
         let config = self.create_tls_config()?;
         let acceptor = TlsAcceptor::from(Arc::new(config));
-        let mut listener = AddrIncoming::from_listener(listener)
-            .map_err(ServeListenerError)?;
+        let mut listener = AddrIncoming::from_listener(listener).map_err(ServeListenerError)?;
 
         loop {
-            let stream =
-                poll_fn(|ctx| Pin::new(&mut listener).poll_accept(ctx)).await;
+            let stream = poll_fn(|ctx| Pin::new(&mut listener).poll_accept(ctx)).await;
 
             let acceptor = acceptor.clone();
 
