@@ -1,8 +1,11 @@
 use clap::Parser;
-use hyper::server::conn::Http;
+use http_body_util::Full;
+use hyper::body::{Bytes, Incoming};
+use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::{Body, Request, Response};
+use hyper::{Request, Response};
 use hyper_mtls_server::MtlServer;
+use hyper_util::rt::TokioIo;
 use std::convert::Infallible;
 use std::error::Error;
 use tokio::net::TcpListener;
@@ -43,11 +46,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let accept_result = acceptor.accept(stream).await;
                 match accept_result {
                     Ok(stream) => {
-                        if let Err(err) = Http::new()
-                            .serve_connection(stream, service_fn(handler))
+                        let io = TokioIo::new(stream);
+                        if let Err(err) = http1::Builder::new()
+                            .serve_connection(io, service_fn(handler))
                             .await
                         {
-                            eprintln!("error while serving http connection: {:?}", err);
+                            eprintln!(
+                                "error while serving http connection: {:?}",
+                                err
+                            );
                         }
                     }
                     Err(err) => {
@@ -65,7 +72,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn handler(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn handler(
+    _req: Request<Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
     Ok(Response::builder()
         .status(200)
         .body("Hello from mTLS".into())
