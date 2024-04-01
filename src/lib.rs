@@ -1,8 +1,9 @@
 use crate::Error::{
-    CertFileReadError, PrivateKeyExtractError, PrivateKeyFileReadError,
-    PrivateKeyItemEmptyError, ServerConfigError, TrustStoreError,
+    CertExtractError, CertFileReadError, ClientVerifierBuildError,
+    PrivateKeyExtractError, PrivateKeyFileReadError, PrivateKeyItemEmptyError,
+    ServerConfigError, ServerListenerAcceptError, TrustStoreError,
 };
-use rustls::server::WebPkiClientVerifier;
+use rustls::server::{VerifierBuilderError, WebPkiClientVerifier};
 use rustls::{RootCertStore, ServerConfig};
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use std::fs::File;
@@ -60,8 +61,11 @@ pub enum Error {
     #[error("failed building server tsl config")]
     ServerConfigError(#[source] rustls::Error),
 
-    #[error("failed to create AddrIncoming form TcpListener")]
-    ServeListenerError(#[source] hyper::Error),
+    #[error("failed to accept incoming connection form listener")]
+    ServerListenerAcceptError(#[source] std::io::Error),
+
+    #[error("failed to build client verifier")]
+    ClientVerifierBuildError(#[source] VerifierBuilderError),
 }
 
 pub struct MtlServer {
@@ -114,8 +118,7 @@ impl MtlServer {
         let certs = match certs {
             Ok(certs) => certs,
             Err(err) => {
-                // todo: better error handling, the new error type and better message
-                return Err(CertFileReadError(CertErrorDetail::new(
+                return Err(CertExtractError(CertErrorDetail::new(
                     "Error reading certificate".into(),
                     err,
                 )));
@@ -154,9 +157,9 @@ impl MtlServer {
             roots.add(cert).map_err(TrustStoreError)?;
         }
 
-        // todo: better error handling
-        let client_verifier =
-            WebPkiClientVerifier::builder(roots.into()).build().unwrap();
+        let client_verifier = WebPkiClientVerifier::builder(roots.into())
+            .build()
+            .map_err(ClientVerifierBuildError)?;
         let server_cert = self.load_server_cert()?;
         let server_key = self.load_server_key()?;
 
@@ -187,7 +190,8 @@ impl MtlServer {
 
         loop {
             // todo: better error handling
-            let (stream, _remote_addr) = listener.accept().await.unwrap();
+            let (stream, _remote_addr) =
+                listener.accept().await.map_err(ServerListenerAcceptError)?;
             let acceptor = acceptor.clone();
             callback(stream, acceptor);
         }
