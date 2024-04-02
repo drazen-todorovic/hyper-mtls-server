@@ -13,3 +13,4 @@ thiserror = "1.0.58"
 tokio = { version = "1.37.0", features = ["net"] }
 tokio-rustls = "0.26.0"
 hyper = { version = "1.2.0", features = ["server", "http1", "http2"] }
+tracing = "0.1.40"

@@ -1,7 +1,7 @@
 use crate::Error::{
     CertExtractError, CertFileReadError, ClientVerifierBuildError,
     PrivateKeyExtractError, PrivateKeyFileReadError, PrivateKeyItemEmptyError,
-    ServerConfigError, ServerListenerAcceptError, TrustStoreError,
+    ServerConfigError, TrustStoreError,
 };
 use rustls::server::{VerifierBuilderError, WebPkiClientVerifier};
 use rustls::{RootCertStore, ServerConfig};
@@ -52,17 +52,11 @@ pub enum Error {
     #[error("private key item is empty")]
     PrivateKeyItemEmptyError,
 
-    #[error("private key is not in expected format (rsa, pkcs8 and ec)")]
-    PrivateKeyUnsupportedFormat,
-
     #[error("failed adding certificate to the cert store")]
     TrustStoreError(#[source] rustls::Error),
 
     #[error("failed building server tsl config")]
     ServerConfigError(#[source] rustls::Error),
-
-    #[error("failed to accept incoming connection form listener")]
-    ServerListenerAcceptError(#[source] std::io::Error),
 
     #[error("failed to build client verifier")]
     ClientVerifierBuildError(#[source] VerifierBuilderError),
@@ -189,11 +183,15 @@ impl MtlServer {
         let acceptor = TlsAcceptor::from(Arc::new(config));
 
         loop {
-            // todo: better error handling
-            let (stream, _remote_addr) =
-                listener.accept().await.map_err(ServerListenerAcceptError)?;
-            let acceptor = acceptor.clone();
-            callback(stream, acceptor);
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let acceptor = acceptor.clone();
+                    callback(stream, acceptor);
+                }
+                Err(err) => {
+                    tracing::error!("server listener accep error: {:?}", err);
+                }
+            };
         }
     }
 }
