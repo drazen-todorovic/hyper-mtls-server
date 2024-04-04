@@ -1,15 +1,14 @@
-use axum::extract::Request;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
 use clap::Parser;
-use hyper::body::Incoming;
-use hyper::service::service_fn;
 use hyper_mtls_server::MtlServer;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo},
+    service::TowerToHyperService,
+};
 use std::error::Error;
 use tokio::net::TcpListener;
-use tower::Service;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -47,11 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             tokio::spawn(async move {
                 let accept_result = acceptor.accept(stream).await;
-
-                let hyper_service =
-                    service_fn(move |request: Request<Incoming>| {
-                        tower_service.clone().call(request)
-                    });
+                let hyper_service = TowerToHyperService::new(tower_service);
 
                 match accept_result {
                     Ok(stream) => {
